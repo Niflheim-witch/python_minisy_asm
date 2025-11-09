@@ -1,0 +1,200 @@
+Metadata-Version: 2.4
+Name: minisys-asm
+Version: 1.0.0
+Summary: Minisys Assembler - Convert Minisys assembly code to machine code
+Home-page: https://github.com/zxuuu/minisys-asm
+Author: SEU Minisys Team
+Author-email: 
+License: MIT
+Keywords: minisys,assembler,mips,education
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Intended Audience :: Developers
+Classifier: Intended Audience :: Education
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.6
+Classifier: Programming Language :: Python :: 3.7
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Topic :: Software Development :: Assemblers
+Classifier: Topic :: Education
+Requires-Python: >=3.6
+Description-Content-Type: text/markdown
+Dynamic: home-page
+Dynamic: requires-python
+
+# Minisys Assembler (Python Version)
+
+这是Minisys汇编器的Python实现，用于将Minisys汇编语言程序转换为机器码，并具有链接功能。本项目基于原有的TypeScript版本进行开发，并增强了指令集支持。
+
+## 项目与原TypeScript版本的差异
+
+### 主要差异
+
+1. **编程语言**：由TypeScript重新实现为Python，提供了更简洁的命令行接口和Python生态系统集成
+
+2. **指令集扩展**：已将原TypeScript版本支持的所有指令添加到Python版本中，包括：
+   - **R型移位指令**：`sllv`、`srlv`、`srav`
+   - **I型分支指令**：`bgez`、`bgtz`、`blez`、`bltz`、`lui`
+   - **特殊指令**：`bgezal`、`bltzal`、`eret`
+
+3. **错误处理优化**：
+   - 修复了原Python版本中的错误类名拼写错误（"SeuerError" → "SevereError"）
+   - 增强了异常处理机制，提供更清晰的错误信息
+
+4. **架构差异**：
+   - TypeScript版本主要面向Web和Node.js环境，支持浏览器运行
+   - Python版本专注于命令行使用，更适合本地开发和集成到Python项目中
+
+5. **构建系统**：
+   - TypeScript版本使用webpack和babel进行构建
+   - Python版本使用setuptools和pip进行安装管理
+
+## 功能特性
+
+- 将Minisys汇编代码转换为机器码
+- 支持所有标准MIPS指令及扩展指令集
+- 数据段指令支持（.data, .byte, .half, .word, .asciiz, .space）
+- 宏定义和宏展开
+- 与BIOS和中断处理程序的链接功能
+- COE格式和UART串行格式输出
+- 简洁易用的命令行界面
+
+## 安装指南
+
+您可以使用pip安装Minisys汇编器：
+
+```bash
+cd py_minisys_asm
+pip install -e .
+```
+
+这将以开发模式安装包，允许您在任何位置运行`minisys-asm`命令。
+
+## 使用方法
+
+### 命令行
+
+```bash
+minisys-asm <input_file> <output_directory> [options]
+```
+
+选项：
+- `-l`, `--link`：与BIOS和中断处理程序链接
+- `-d`, `--debug`：启用调试输出
+
+### 使用示例
+
+```bash
+minisys-asm example.s output/ -l
+```
+
+这将汇编`example.s`，将其与BIOS和中断处理程序链接，并在`output/`目录中生成输出文件。
+
+## 输出文件
+
+汇编器生成以下输出文件：
+
+- `<base_name>_text.coe`：包含程序文本段的COE文件
+- `<base_name>_data.coe`：包含程序数据段的COE文件（如果有）
+- `<base_name>_serial.txt`：用于加载到Minisys系统的UART串行格式文件
+
+## 内存布局
+
+Minisys系统使用哈佛架构，具有以下内存布局：
+
+- **指令内存（64KB）**：地址范围 0x00000000 - 0x0000FFFF
+  - BIOS区域：0x00000000 - 0x000007FF（2KB）
+  - 用户程序区域：0x00000800 - 0x0000EFFC（60KB）
+  - 中断处理程序区域：0x0000F000 - 0x0000FFFC（4KB）
+
+## BIOS功能
+
+BIOS（基本输入/输出系统）执行以下功能：
+
+1. 初始化系统组件
+2. 在串行端口上显示"SEU61522"
+3. 跳转到用户程序入口点（0x00000800）
+
+## 中断处理
+
+中断处理程序入口点位于0x0000F000。当发生中断时，系统跳转到这个地址，其中中断处理程序将：
+
+1. 确定中断类型
+2. 分派到适当的中断服务例程
+
+## 支持的指令
+
+### R型指令
+- add, addu, sub, subu, and, or, xor, nor, slt, sltu
+- sll, srl, sra, sllv, srlv, srav （*已从TypeScript版本添加*）
+- mult, multu, div, divu
+- mfhi, mflo, mthi, mtlo
+- jr, jalr
+
+### I型指令
+- addi, addiu, andi, ori, xori, slti, sltiu
+- lw, sw, lh, lhu, lb, lbu, sh, sb
+- beq, bne
+- bgez, bgtz, blez, bltz, lui （*已从TypeScript版本添加*）
+
+### J型指令
+- j, jal
+- bgezal, bltzal （*已从TypeScript版本添加*）
+
+### 特殊指令
+- nop, syscall, mfc0, mtc0
+- eret （*已从TypeScript版本添加*）
+
+## 数据指令
+
+- `.byte`：定义字节值
+- `.half`：定义半字（2字节）值
+- `.word`：定义字（4字节）值
+- `.asciiz`：定义以空字符结尾的ASCII字符串
+- `.space`：在内存中保留空间
+
+## 宏定义
+
+您可以在汇编代码中定义和使用宏：
+
+```assembly
+.macro PRINT_STRING(str)
+    la $a0, \str
+    li $v0, 4
+    syscall
+.end_macro
+
+PRINT_STRING(hello_str)
+```
+
+## 开发说明
+
+### 项目结构
+
+- `py_minisys_asm/`：主源码目录
+  - `__init__.py`：包初始化文件
+  - `assembler.py`：汇编器核心功能
+  - `instruction.py`：指令定义和处理
+  - `convert.py`：数据转换功能
+  - `linker.py`：链接器功能
+  - `main.py`：主程序入口
+  - `cli.py`：命令行界面
+  - `utils.py`：工具函数
+  - `register.py`：寄存器定义
+  - `snippet/`：BIOS和中断处理程序片段
+
+### 贡献指南
+
+如果您想为项目做出贡献，请遵循以下步骤：
+
+1. Fork本仓库
+2. 创建您的特性分支（`git checkout -b feature/amazing-feature`）
+3. 提交您的更改（`git commit -m 'Add some amazing feature'`）
+4. 推送到分支（`git push origin feature/amazing-feature`）
+5. 开启一个Pull Request
+
+## 许可证
+
+本项目采用MIT许可证。详见LICENSE文件。
