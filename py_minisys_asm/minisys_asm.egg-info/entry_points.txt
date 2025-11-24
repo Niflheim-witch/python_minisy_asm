@@ -1,2 +1,0 @@
-[console_scripts]
-minisys-asm = py_minisys_asm.cli:main
