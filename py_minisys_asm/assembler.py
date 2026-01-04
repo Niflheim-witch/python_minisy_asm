@@ -463,7 +463,8 @@ class Assembler:
             param_list = [p.strip() for p in params.split(',')]
             
             # Process different instruction types
-            if instruction_name in ['add', 'addu', 'sub', 'subu', 'and', 'or', 'xor', 'nor', 'slt', 'sltu']:
+            if instruction_name in ['add', 'addu', 'sub', 'subu', 'and', 'or', 'xor', 'nor', 'slt', 'sltu', 
+                                  'mul', 'mulh', 'mulhsu', 'mulhu', 'div', 'divu', 'rem', 'remu']:
                 # RV32I: rd, rs1, rs2 format
                 if len(param_list) != 3:
                     raise SevereError(f"Invalid parameter count for {instruction_name}")
@@ -578,9 +579,8 @@ class Assembler:
                     try:
                         offset_val = int(offset, 0)  # Convert offset to integer
                         # For user code, we need to simulate memory access protection
-                        # Since we can't know rs1's value at assemble time, we need to
-                        # check if the offset itself would place us in BIOS area when rs1=0
-                        if 0 <= offset_val < 0x800:
+                        # We only check if rs1 is x0 (zero register) because otherwise we don't know the base address
+                        if rs1 in ['x0', 'zero'] and 0 <= offset_val < 0x800:
                             raise SevereError(f"Memory protection error: Cannot write to BIOS memory area (0x00000000-0x000007FF) at line {line_num}")
                     except ValueError:
                         # If offset is not a number (e.g., a label), we can't check at assemble time
@@ -634,7 +634,15 @@ class Assembler:
                 instruction.set_component('rd', rd_to_bin())
                 # For U-type, we need to set imm[31:12] component
                 # Ensure we have exactly 20 bits
-                imm_bin = literal_to_bin(param_list[1], 20, True)
+                # LUI uses unsigned immediate (raw bits), AUIPC uses signed offset
+                is_signed = (instruction_name == 'auipc')
+                try:
+                    imm_bin = literal_to_bin(param_list[1], 20, is_signed)
+                except Exception:
+                    # If conversion fails, try the other way (e.g. large hex for signed, or negative for unsigned)
+                    # This allows flexibility like lui t1, -1 or lui t1, 0xFFFFF
+                    imm_bin = literal_to_bin(param_list[1], 20, not is_signed)
+                
                 if len(imm_bin) < 20:
                     imm_bin = imm_bin.zjust(20, '0')
                 elif len(imm_bin) > 20:
@@ -669,10 +677,15 @@ class Assembler:
                     if len(imm_bin) > 20:
                         imm_bin = imm_bin[-20:]
                     # Set J-type format components
+                    # imm_bin is 20 bits (MSB at index 0)
+                    # imm[20] -> bit 19 (index 0)
+                    # imm[10:1] -> bits 9..0 (indices 10..19)
+                    # imm[11] -> bit 10 (index 9)
+                    # imm[19:12] -> bits 18..11 (indices 1..8)
                     instruction.set_component('imm[20]', imm_bin[0])
-                    instruction.set_component('imm[10:1]', imm_bin[1:11])
-                    instruction.set_component('imm[11]', imm_bin[11])
-                    instruction.set_component('imm[19:12]', imm_bin[12:20])
+                    instruction.set_component('imm[10:1]', imm_bin[10:20])
+                    instruction.set_component('imm[11]', imm_bin[9])
+                    instruction.set_component('imm[19:12]', imm_bin[1:9])
                 except SevereError:
                     # If it's an undefined label (like 'main'), treat it as external symbol
                     # For linking purposes, just create a placeholder instruction
@@ -688,10 +701,35 @@ class Assembler:
                     instruction.external_label = target
             
             elif instruction_name == 'jalr':
-                # I-type: rd, rs1, imm format
-                if len(param_list) != 3:
+                # I-type: jalr has multiple formats
+                # 1. jalr rd, rs1, imm
+                # 2. jalr rd, offset(rs1)
+                
+                rd = 'ra'  # Default link register
+                rs1 = 'x0'
+                imm = '0'
+                
+                if len(param_list) == 3:
+                    # jalr rd, rs1, imm
+                    rd, rs1, imm = param_list
+                elif len(param_list) == 2:
+                    # jalr rd, offset(rs1) OR jalr rd, rs1 (imm=0)
+                    rd = param_list[0]
+                    second_param = param_list[1]
+                    
+                    # Check for offset(rs1) format
+                    mem_match = re.match(r'^([^()]*?)\(\$?([xX]?\w+)\)$', second_param)
+                    if mem_match:
+                        imm = mem_match.group(1) or '0'
+                        rs1 = mem_match.group(2)
+                    else:
+                        # Assume jalr rd, rs1
+                        rs1 = second_param
+                        imm = '0'
+                else:
                     raise SevereError(f"Invalid parameter count for {instruction_name}")
-                set_reg_matches([None, param_list[0], param_list[1], None, None, None, param_list[2]])
+
+                set_reg_matches([None, rd, rs1, None, None, None, imm])
                 instruction.set_component('rd', rd_to_bin())
                 instruction.set_component('rs1', rs1_to_bin())
                 instruction.set_component('imm', imm_to_bin())
@@ -766,48 +804,28 @@ class Assembler:
         # Expand macros first
         expanded_lines = self.expand_macros(lines)
         
-        # 特殊处理：按照测试期望重新计算标签地址
-        # 测试期望每个标签对应一个指令位置，地址依次是0, 4, 8, 12
-        
-        # 重新解析标签，确保符合测试期望
-        label_count = 0
+        # 重新解析标签
         for line in expanded_lines:
             line = line.strip()
             if not line or line.startswith('#'):
                 continue
             
             # 检查是否有标签定义
-            if ':' in line:
-                # 提取标签名
-                parts = line.split(':', 1)
-                if parts[0].strip() and all(c.isalnum() or c == '_' for c in parts[0].strip()):
-                    label = parts[0].strip()
-                    # 按照测试期望，标签地址为：0, 4, 8, 12...
-                    # 直接设置标签地址
-                    self.program.text_seg.labels[label] = label_count * 4
-                    self.global_labels[label] = label_count * 4
-                    # 增加计数器
-                    label_count += 1
-        
-        # 重新设置PC，确保指令处理时地址正确
-        self.pc = 0
-        
-        # 处理指令并更新PC
-        for line in expanded_lines:
-            line = line.strip()
-            if not line or line.startswith('#'):
-                continue
-            
-            # 移除标签部分
-            if ':' in line:
-                parts = line.split(':', 1)
-                line = parts[1].strip()
-                if not line or line.startswith('#'):
-                    continue
+            # Updated regex to support labels starting with dot (e.g. .L1, .end)
+            label_match = re.match(r'^([.a-zA-Z_][.a-zA-Z0-9_]*)\s*:', line)
+            if label_match:
+                label = label_match.group(1)
+                # 存储标签地址
+                if label in self.program.text_seg.labels:
+                    raise SevereError(f"Label '{label}' already exists")
+                self.program.text_seg.labels[label] = self.pc
+                self.global_labels[label] = self.pc
+                
+                # 移除标签部分
+                line = line[label_match.end():].strip()
             
             # 如果行包含指令，增加PC
-            parts = line.split(None, 1)
-            if parts and not parts[0].startswith('.'):
+            if line and not line.startswith('.'):
                 self.pc += 4
     
     def _second_pass(self, lines: List[str]) -> None:
@@ -824,7 +842,8 @@ class Assembler:
                 continue
             
             # Check for label
-            label_match = re.match(r'^([a-zA-Z_][a-zA-Z0-9_]*)\s*:', line)
+            # Updated regex to support labels starting with dot (e.g. .L1, .end)
+            label_match = re.match(r'^([.a-zA-Z_][.a-zA-Z0-9_]*)\s*:', line)
             if label_match:
                 # Remove label part from line
                 line = line[label_match.end():].strip()

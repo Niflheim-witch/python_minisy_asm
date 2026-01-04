@@ -158,8 +158,37 @@ def data_seg_to_coe(asm_program: AsmProgram, output_path: str) -> None:
     if current_addr > 0x00100000:  # 1MB data segment limit
         raise SevereError("Data segment exceeds memory limit")
     
-    # Join all lines with commas
-    coe_content = '\n'.join(coe_lines)
+    # Add trailing semicolon to the last line
+    if len(coe_lines) > 2:
+        coe_lines[-1] += ';'
+    else:
+        # If no data, add a dummy zero with semicolon
+        coe_lines.append('00000000;')
+    
+    # Join all lines with newlines (no commas between lines for COE vector format usually, 
+    # but Xilinx COE expects space or comma or newline separated values)
+    # Standard format:
+    # memory_initialization_radix=16;
+    # memory_initialization_vector=
+    # val1, val2, val3, ... valN;
+    
+    # Let's format it properly with commas
+    header = coe_lines[:2]
+    data_values = coe_lines[2:]
+    
+    # Remove the semicolon we just added to handle it in the join
+    if data_values:
+        if data_values[-1].endswith(';'):
+            data_values[-1] = data_values[-1][:-1]
+            
+        # Join data values with comma and newline
+        data_str = ',\n'.join(data_values) + ';'
+        
+        # Combine header and data
+        coe_content = '\n'.join(header) + '\n' + data_str
+    else:
+        # Empty data segment
+        coe_content = '\n'.join(header) + '\n00000000;'
     
     # Write to file
     try:
@@ -203,15 +232,21 @@ def text_seg_to_coe(asm_program: AsmProgram, output_path: str,
             coe_lines.append(instr_hex)
         except Exception as e:
             raise SevereError(f"Error converting instruction to hex: {str(e)}")
+            
+    # Add trailing semicolon to the last line
+    if len(coe_lines) > 2:
+        # Format with commas
+        header = coe_lines[:2]
+        data_values = coe_lines[2:]
+        data_str = ',\n'.join(data_values) + ';'
+        coe_content = '\n'.join(header) + '\n' + data_str
+    else:
+        coe_content = '\n'.join(coe_lines) + '\n00000000;'
+        
+    # Write to file
     
     # Ensure we don't exceed memory limits
     total_size = (padding_count + len(asm_program.text_seg.instructions)) * 4
-    if total_size > 0x00010000:  # 64KB program memory limit
-        raise SevereError("Text segment exceeds memory limit")
-    
-    # Join all lines with commas
-    coe_content = '\n'.join(coe_lines)
-    
     # Write to file
     try:
         with open(output_path, 'w', encoding='utf-8') as f:

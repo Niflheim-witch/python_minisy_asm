@@ -14,9 +14,9 @@ from .instruction import Instruction
 BIOS_ADDR = 0x00000000       # BIOS starting address
 BIOS_SIZE = 0x00000800       # 2KB BIOS
 USER_ADDR = 0x00000800       # User program starting address
-USER_SIZE = 0x0000F000       # 60KB user program space
+USER_SIZE = 0x0000E800       # 58KB user program space
 INT_ADDR = 0x0000F000        # Interrupt handler starting address
-INT_SIZE = 0x00000FFC        # 4KB interrupt handler space
+INT_SIZE = 0x00001000        # 4KB interrupt handler space
 TOTAL_MEM_SIZE = 0x00010000  # 64KB total memory
 
 

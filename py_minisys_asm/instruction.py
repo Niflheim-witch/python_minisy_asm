@@ -209,7 +209,7 @@ def rt1_to_bin():
     # For backward compatibility
     return rs2_to_bin()
 
-def imm_to_bin(len_=16):
+def imm_to_bin(len_=12):
     # Ensure _reg_matches has enough elements and the appropriate element is not None
     if len(_reg_matches) > 6 and _reg_matches[6] is not None:
         # RISC-V立即数通常是有符号的
@@ -363,6 +363,99 @@ new_instruction('and', 'Bitwise AND', '(rd)←(rs1)&(rs2)',
 ])
 
 # =================== End of RV32I R-type Instructions ===================
+
+# =================== RV32M Instructions (Multiplication and Division) ===================
+# Format: funct7 | rs2 | rs1 | funct3 | rd | opcode
+# Opcode: 0110011 (same as R-type arithmetic)
+# Funct7: 0000001 (MULDIV)
+
+# MUL - rd, rs1, rs2
+new_instruction('mul', 'Multiply', '(rd)←(rs1)*(rs2) (low 32 bits)', 
+               param_pattern(3), [
+    [31, 25, 'funct7', noop, 'fixed', '0000001'],
+    [24, 20, 'rs2', rs2_to_bin, 'reg', ''],
+    [19, 15, 'rs1', rs1_to_bin, 'reg', ''],
+    [14, 12, 'funct3', noop, 'fixed', '000'],
+    [11, 7, 'rd', rd_to_bin, 'reg', ''],
+    [6, 0, 'opcode', noop, 'fixed', '0110011'],
+])
+
+# MULH - rd, rs1, rs2
+new_instruction('mulh', 'Multiply High Signed', '(rd)←((rs1)*(rs2)) >> 32 (signed)', 
+               param_pattern(3), [
+    [31, 25, 'funct7', noop, 'fixed', '0000001'],
+    [24, 20, 'rs2', rs2_to_bin, 'reg', ''],
+    [19, 15, 'rs1', rs1_to_bin, 'reg', ''],
+    [14, 12, 'funct3', noop, 'fixed', '001'],
+    [11, 7, 'rd', rd_to_bin, 'reg', ''],
+    [6, 0, 'opcode', noop, 'fixed', '0110011'],
+])
+
+# MULHSU - rd, rs1, rs2
+new_instruction('mulhsu', 'Multiply High Signed-Unsigned', '(rd)←((rs1)*(rs2)) >> 32 (signed x unsigned)', 
+               param_pattern(3), [
+    [31, 25, 'funct7', noop, 'fixed', '0000001'],
+    [24, 20, 'rs2', rs2_to_bin, 'reg', ''],
+    [19, 15, 'rs1', rs1_to_bin, 'reg', ''],
+    [14, 12, 'funct3', noop, 'fixed', '010'],
+    [11, 7, 'rd', rd_to_bin, 'reg', ''],
+    [6, 0, 'opcode', noop, 'fixed', '0110011'],
+])
+
+# MULHU - rd, rs1, rs2
+new_instruction('mulhu', 'Multiply High Unsigned', '(rd)←((rs1)*(rs2)) >> 32 (unsigned)', 
+               param_pattern(3), [
+    [31, 25, 'funct7', noop, 'fixed', '0000001'],
+    [24, 20, 'rs2', rs2_to_bin, 'reg', ''],
+    [19, 15, 'rs1', rs1_to_bin, 'reg', ''],
+    [14, 12, 'funct3', noop, 'fixed', '011'],
+    [11, 7, 'rd', rd_to_bin, 'reg', ''],
+    [6, 0, 'opcode', noop, 'fixed', '0110011'],
+])
+
+# DIV - rd, rs1, rs2
+new_instruction('div', 'Divide Signed', '(rd)←(rs1)/(rs2) (signed)', 
+               param_pattern(3), [
+    [31, 25, 'funct7', noop, 'fixed', '0000001'],
+    [24, 20, 'rs2', rs2_to_bin, 'reg', ''],
+    [19, 15, 'rs1', rs1_to_bin, 'reg', ''],
+    [14, 12, 'funct3', noop, 'fixed', '100'],
+    [11, 7, 'rd', rd_to_bin, 'reg', ''],
+    [6, 0, 'opcode', noop, 'fixed', '0110011'],
+])
+
+# DIVU - rd, rs1, rs2
+new_instruction('divu', 'Divide Unsigned', '(rd)←(rs1)/(rs2) (unsigned)', 
+               param_pattern(3), [
+    [31, 25, 'funct7', noop, 'fixed', '0000001'],
+    [24, 20, 'rs2', rs2_to_bin, 'reg', ''],
+    [19, 15, 'rs1', rs1_to_bin, 'reg', ''],
+    [14, 12, 'funct3', noop, 'fixed', '101'],
+    [11, 7, 'rd', rd_to_bin, 'reg', ''],
+    [6, 0, 'opcode', noop, 'fixed', '0110011'],
+])
+
+# REM - rd, rs1, rs2
+new_instruction('rem', 'Remainder Signed', '(rd)←(rs1)%(rs2) (signed)', 
+               param_pattern(3), [
+    [31, 25, 'funct7', noop, 'fixed', '0000001'],
+    [24, 20, 'rs2', rs2_to_bin, 'reg', ''],
+    [19, 15, 'rs1', rs1_to_bin, 'reg', ''],
+    [14, 12, 'funct3', noop, 'fixed', '110'],
+    [11, 7, 'rd', rd_to_bin, 'reg', ''],
+    [6, 0, 'opcode', noop, 'fixed', '0110011'],
+])
+
+# REMU - rd, rs1, rs2
+new_instruction('remu', 'Remainder Unsigned', '(rd)←(rs1)%(rs2) (unsigned)', 
+               param_pattern(3), [
+    [31, 25, 'funct7', noop, 'fixed', '0000001'],
+    [24, 20, 'rs2', rs2_to_bin, 'reg', ''],
+    [19, 15, 'rs1', rs1_to_bin, 'reg', ''],
+    [14, 12, 'funct3', noop, 'fixed', '111'],
+    [11, 7, 'rd', rd_to_bin, 'reg', ''],
+    [6, 0, 'opcode', noop, 'fixed', '0110011'],
+])
 
 # =================== RV32I I-type Instructions ===================
 # Format: imm[11:0] | rs1 | funct3 | rd | opcode
