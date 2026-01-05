@@ -342,6 +342,101 @@ def coe_to_txt(text_coe_path: str, data_coe_path: Optional[str],
         raise SevereError(f"Failed to write serial TXT file: {str(e)}")
 
 
+def coe_to_hex(text_coe_path: str, data_coe_path: Optional[str], output_path: str, start_address: str = '@00000000', skip_words: int = 0) -> None:
+    """
+    Convert COE files to a simple HEX file (raw hex values, one per line)
+    
+    Args:
+        text_coe_path: Path to input text COE file
+        data_coe_path: Path to input data COE file (optional)
+        output_path: Path to output HEX file
+        start_address: The start address string (e.g. '@00000000')
+        skip_words: Number of words to skip from the beginning of the text segment
+    """
+    try:
+        with open(text_coe_path, 'r', encoding='utf-8') as f:
+            text_content = f.read()
+    except Exception as e:
+        raise SevereError(f"Failed to read text COE file: {str(e)}")
+    
+    # Extract text data
+    text_data_lines = text_content.split(';')
+    if len(text_data_lines) < 2:
+        raise SevereError("Invalid text COE file format")
+    
+    # Get the vector data
+    text_vector_line = text_data_lines[1].strip()
+    if not text_vector_line.startswith('memory_initialization_vector='):
+        raise SevereError("Invalid text COE file format")
+    
+    # Split the vector into hex values
+    # Handle both comma-separated and newline/space-separated formats
+    raw_values = text_vector_line[len('memory_initialization_vector='):]
+    text_values = raw_values.replace(',', ' ').split()
+    
+    # Skip words if requested
+    if skip_words > 0:
+        if skip_words < len(text_values):
+            text_values = text_values[skip_words:]
+        else:
+            text_values = []
+
+    # Remove trailing zeros
+    while text_values and int(text_values[-1], 16) == 0:
+        text_values.pop()
+    
+    # Read data COE file if provided
+    data_values = []
+    if data_coe_path:
+        try:
+            with open(data_coe_path, 'r', encoding='utf-8') as f:
+                data_content = f.read()
+        except Exception as e:
+            raise SevereError(f"Failed to read data COE file: {str(e)}")
+        
+        # Extract data
+        data_data_lines = data_content.split(';')
+        if len(data_data_lines) < 2:
+            raise SevereError("Invalid data COE file format")
+        
+        # Get the vector data
+        data_vector_line = data_data_lines[1].strip()
+        if not data_vector_line.startswith('memory_initialization_vector='):
+            raise SevereError("Invalid data COE file format")
+        
+        # Split the vector into hex values
+        data_values = data_vector_line[len('memory_initialization_vector='):].split(',')
+        data_values = [val.strip() for val in data_values if val.strip()]
+    
+    # Create hex output
+    hex_lines = []
+    
+    # Add start address for Verilog $readmemh compatibility
+    hex_lines.append(start_address)
+    
+    # Add program data
+    for val in text_values:
+        # Ensure each value is 8 hex digits
+        val = val.zfill(8)
+        hex_lines.append(val)
+        
+    # Add data values
+    for val in data_values:
+        # Ensure each value is 8 hex digits
+        val = val.zfill(8)
+        hex_lines.append(val)
+    
+    # Join all lines
+    hex_content = '\n'.join(hex_lines)
+    
+    # Write to file
+    try:
+        with open(output_path, 'w', encoding='utf-8') as f:
+            f.write(hex_content)
+    except Exception as e:
+        raise SevereError(f"Failed to write HEX file: {str(e)}")
+
+
 def convert_linked_to_coe(linked_memory: List[str], data_map: List[int], 
                          text_coe_path: str, data_coe_path: str, show_zeros: bool = True) -> None:
     """

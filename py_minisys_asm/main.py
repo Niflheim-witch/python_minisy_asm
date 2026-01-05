@@ -11,7 +11,7 @@ from typing import Optional, Tuple
 from .assembler import Assembler, AsmProgram
 from .linker import link_all
 from .convert import (
-    data_seg_to_coe, text_seg_to_coe, coe_to_txt, convert_linked_to_coe
+    data_seg_to_coe, text_seg_to_coe, coe_to_txt, coe_to_hex, convert_linked_to_coe
 )
 from .utils import SevereError
 
@@ -31,6 +31,8 @@ def parse_arguments() -> argparse.Namespace:
     # Optional arguments
     parser.add_argument('-s', '--bios-only', action='store_true',
                        help='Assemble BIOS only and write to output, ignore user program')
+    parser.add_argument('--hex', action='store_true',
+                       help='Generate HEX file output')
     parser.add_argument('-d', '--debug', action='store_true',
                        help='Enable debug output')
     
@@ -148,6 +150,21 @@ def handle_assembly(args: argparse.Namespace) -> Tuple[str, str, str]:
     if args.debug:
         print(f"Serial TXT file generated: {serial_txt_path}")
     
+    # Generate HEX file if requested
+    if args.hex:
+        base_name = os.path.splitext(os.path.basename(args.in_file))[0]
+        hex_path = os.path.join(args.out_dir, f'{base_name}.hex')
+        
+        if args.debug:
+            print("Generating HEX file...")
+            
+        # For normal user programs, we skip the BIOS (first 512 words / 2KB)
+        # and start at address 0x800
+        coe_to_hex(text_coe_path, data_coe_path, hex_path, start_address='@00000800', skip_words=512)
+        
+        if args.debug:
+            print(f"HEX file generated: {hex_path}")
+
     return text_coe_path, data_coe_path, serial_txt_path
 
 
