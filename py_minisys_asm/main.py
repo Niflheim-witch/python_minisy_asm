@@ -160,7 +160,11 @@ def handle_assembly(args: argparse.Namespace) -> Tuple[str, str, str]:
             
         # For normal user programs, we skip the BIOS (first 512 words / 2KB)
         # and start at address 0x800
-        coe_to_hex(text_coe_path, data_coe_path, hex_path, start_address='@00000800', skip_words=512)
+        # coe_to_hex(text_coe_path, data_coe_path, hex_path, start_address='@00000800', skip_words=512)
+        
+        # Output FULL memory (starting from 0x00000800) to include BIOS
+        # Hardware executes from 0x800 (word address), which is 0x2000 (byte address)
+        coe_to_hex(text_coe_path, data_coe_path, hex_path, start_address='@00000800', skip_words=0)
         
         if args.debug:
             print(f"HEX file generated: {hex_path}")

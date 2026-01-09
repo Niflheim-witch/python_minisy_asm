@@ -80,6 +80,77 @@ def link_all(asm_program: AsmProgram, user_code_start: int = USER_ADDR, use_real
     else:
         bios_instructions = _create_simple_bios()
     
+    # Check if 'main' label exists and patch BIOS jump target
+    # This is to support hardware that starts execution at a specific address (e.g. 0x2000)
+    # and needs to jump to the actual main function which might not be at 0x2800
+    if 'main' in asm_program.text_seg.labels:
+        main_offset = asm_program.text_seg.labels['main']
+        print(f"DEBUG: Found main at offset {main_offset}")
+        # Physical Address Calculation:
+        # Base (BIOS Start) = 0x2000 (800 words, per user hardware spec)
+        # User Offset = 0x800 (Size of BIOS in logic space)
+        # Main Offset = asm_program.text_seg.labels['main']
+        target_addr = 0x2000 + 0x800 + main_offset
+        print(f"DEBUG: Target address {hex(target_addr)}")
+        
+        # Calculate hi20 and lo12 for lui/addi (handling sign extension)
+        # If lo_12 is negative (bit 11 is 1), addi will subtract, so we need to add 1 to hi_20
+        # hi_20 = (target_addr + 0x800) >> 12
+        # lo_12 = target_addr & 0xFFF
+        
+        # Adjust lo_12 for assembler (it expects signed integer for addi)
+        # If lo_12 >= 2048 (0x800), it represents a negative number in 12-bit 2's complement
+        # if lo_12 >= 0x800:
+        #    lo_12_signed = lo_12 - 0x1000
+        # else:
+        #    lo_12_signed = lo_12
+            
+        print(f"DEBUG: Using JAL instruction for main jump")
+        
+        # Calculate Jump Offset for JAL
+        # Target Address = 0x2000 (Base) + 0x800 (User Offset) + main_offset
+        # Current PC = 0x2000
+        # Offset = Target - PC = 0x800 + main_offset
+        jump_offset = 0x800 + main_offset
+        
+        # JAL Instruction Encoding (J-type)
+        # 31    | 30:21     | 20      | 19:12      | 11:7 | 6:0
+        # imm[20] | imm[10:1] | imm[11] | imm[19:12] | rd   | opcode
+        
+        imm = jump_offset
+        rd = 1      # x1 (ra) - Use Call convention instead of Jump
+        opcode = 0x6F # 1101111 (JAL)
+        
+        imm_20 = (imm >> 20) & 1
+        imm_10_1 = (imm >> 1) & 0x3FF
+        imm_11 = (imm >> 11) & 1
+        imm_19_12 = (imm >> 12) & 0xFF
+        
+        inst_val = (imm_20 << 31) | (imm_10_1 << 21) | (imm_11 << 20) | (imm_19_12 << 12) | (rd << 7) | opcode
+        jal_hex = f"{inst_val:08x}".lower()
+        
+        # Create patch instruction list (only 1 instruction)
+        # We don't need the assembler here since we manually encoded it
+        patch_instructions = [jal_hex]
+        
+        try:
+            print(f"DEBUG: Patch manually encoded. JAL offset={jump_offset}, hex={jal_hex}")
+            
+            # Patch the beginning of BIOS instructions
+            # First, fill the entire BIOS text region with Zeros (NOPs) for safety
+            # But keep the size consistent
+            bios_size_words = len(bios_instructions)
+            for k in range(bios_size_words):
+                bios_instructions[k] = '00000000'
+                
+            # Then apply the patch instructions at the beginning
+            for i, instr_hex in enumerate(patch_instructions):
+                if i < len(bios_instructions):
+                    print(f"DEBUG: Patching BIOS[{i}]: -> {instr_hex}")
+                    bios_instructions[i] = instr_hex
+        except Exception as e:
+            print(f"Warning: Failed to patch BIOS with main address: {e}")
+
     # Add BIOS to memory
     for i, instr_hex in enumerate(bios_instructions):
         if i * 4 < BIOS_SIZE:
@@ -233,7 +304,10 @@ def _load_bios() -> List[str]:
         List of hex instruction strings
     """
     snippet_path = _get_snippet_path()
-    bios_file = os.path.join(snippet_path, 'minisys-bios.asm')
+    # PREFER custom BIOS if it exists (for debugging specific user programs)
+    # Changed to use the MINIMAL jump BIOS (no stack init)
+    custom_bios = os.path.join(snippet_path, 'custom_bios_minimal_jump.asm')
+    bios_file = custom_bios if os.path.exists(custom_bios) else os.path.join(snippet_path, 'minisys-bios.asm')
     
     try:
         # 读取BIOS文件内容

@@ -614,8 +614,8 @@ class Assembler:
                 # For B-type, calculate offset and split into format
                 # Use current_pc (address of this instruction) for offset calculation
                 label_addr = self.get_label_addr(label)
-                # For branch, offset is (label_addr - (current_pc + 4)) // 2
-                offset = (label_addr - (self.current_pc + 4)) // 2
+                # For branch, offset is (label_addr - current_pc) // 2
+                offset = (label_addr - self.current_pc) // 2
                 # Convert to 12-bit signed binary
                 imm_bin = literal_to_bin(str(offset), 12, True)
                 # Ensure we have exactly 12 bits
@@ -668,8 +668,8 @@ class Assembler:
                     # Try to parse as a label first
                     label_addr = self.get_label_addr(target)
                     
-                    # For jump, offset is (label_addr - (current_pc + 4)) // 2
-                    offset = (label_addr - (self.current_pc + 4)) // 2
+                    # For jump, offset is (label_addr - current_pc) // 2
+                    offset = (label_addr - self.current_pc) // 2
                     # Convert to 20-bit signed binary
                     imm_bin = literal_to_bin(str(offset), 20, True)
                     # Ensure we have exactly 20 bits
