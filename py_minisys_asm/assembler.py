@@ -143,63 +143,7 @@ class Assembler:
                 # Parse variable components
                 components: List[VarComponent] = []
                 
-                # Handle .byte directive
-                if content.startswith('.byte'):
-                    # Parse .byte values
-                    values_str = content[5:].strip()
-                    values = self._parse_comma_separated_values(values_str)
-                    for val in values:
-                        components.append(self.new_comp('byte', val))
-                
-                # Handle .half directive
-                elif content.startswith('.half'):
-                    # Parse .half values
-                    values_str = content[5:].strip()
-                    values = self._parse_comma_separated_values(values_str)
-                    for val in values:
-                        components.append(self.new_comp('half', val))
-                
-                # Handle .word directive
-                elif content.startswith('.word'):
-                    # Parse .word values
-                    values_str = content[5:].strip()
-                    values = self._parse_comma_separated_values(values_str)
-                    for val in values:
-                        components.append(self.new_comp('word', val))
-                
-                # Handle .asciiz directive
-                elif content.startswith('.asciiz'):
-                    # Parse string with simpler approach
-                    str_content = content[7:].strip()
-                    # Check if string starts with quote
-                    if not str_content.startswith('"'):
-                        raise SevereError(f"Invalid string in .asciiz directive")
-                    
-                    # Find the first and last quote
-                    first_quote = str_content.find('"')
-                    last_quote = str_content.rfind('"')
-                    
-                    if first_quote == last_quote:
-                        raise SevereError(f"Unclosed string in .asciiz directive")
-                    
-                    # Extract string content between quotes
-                    string_val = str_content[first_quote+1:last_quote]
-                    # Process escaped characters
-                    string_val = self._process_escaped_chars(string_val)
-                    components.append(self.new_comp('asciiz', string_val))
-                
-                # Handle .space directive
-                elif content.startswith('.space'):
-                    # Parse space size
-                    size_match = re.search(r'(\d+)', content[6:])
-                    if not size_match:
-                        raise SevereError(f"Invalid size in .space directive")
-                    
-                    size = int(size_match.group(1))
-                    components.append(self.new_comp('space', size))
-                
-                else:
-                    raise SevereError(f"Unknown directive: {content.split()[0]}")
+                raise SevereError(f"Unknown directive: {content.split()[0]}")
                 
                 # Add variable to data segment
                 self.new_var(var_name, components)
