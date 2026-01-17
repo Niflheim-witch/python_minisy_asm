@@ -26,7 +26,7 @@ def data_seg_to_coe(asm_program: AsmProgram, output_path: str) -> None:
     sorted_vars = sorted(asm_program.data_seg.vars.items(), 
                         key=lambda x: asm_program.data_seg.addrs[x[0]])
     
-    current_addr = 0
+    current_addr = 0x10000
     
     # Process each variable
     for var_name, components in sorted_vars:

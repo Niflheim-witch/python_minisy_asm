@@ -1,2 +1,0 @@
-# This project has no external runtime dependencies.
-# Dependencies are listed in setup.py and pyproject.toml

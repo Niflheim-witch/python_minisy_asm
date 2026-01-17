@@ -194,21 +194,6 @@ def rd_to_bin():
     # For U-type and J-type: instruction rd, imm
     return reg_to_bin(_reg_matches[1]) if len(_reg_matches) > 1 else reg_to_bin(None)
 
-# Keep compatibility functions
-def rs_to_bin():
-    # For backward compatibility with code expecting MIPS format
-    # In RV32I, this is typically rs1
-    return rs1_to_bin()
-
-def rt_to_bin():
-    # For backward compatibility with code expecting MIPS format
-    # In RV32I, this is typically rs2
-    return rs2_to_bin()
-
-def rt1_to_bin():
-    # For backward compatibility
-    return rs2_to_bin()
-
 def imm_to_bin(len_=12):
     # Ensure _reg_matches has enough elements and the appropriate element is not None
     if len(_reg_matches) > 6 and _reg_matches[6] is not None:
@@ -241,9 +226,6 @@ def shamt_to_bin():
         return literal_to_bin(_reg_matches[6], 5)
     # Default to 0 if no shamt provided
     return '00000'
-
-def c0sel_to_bin():
-    return literal_to_bin(_reg_matches[3], 6)
 
 def var_to_bin():
     return var_to_addr_bin(_reg_matches[6], 16)

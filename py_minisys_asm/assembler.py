@@ -64,7 +64,7 @@ class Assembler:
         self.pc = 0
         self.current_pc = 0  # Used for branch offset calculation
         self.macros = Macros()
-        self.data_addr = 0  # 数据段地址计数器
+        self.data_addr = 0x10000  # 数据段地址计数器
         self.global_labels = {}  # 全局标签字典
         self.global_var_to_addr = {}  # 全局变量到地址的映射
         
@@ -816,7 +816,7 @@ def get_current_assembler():
 
 
 # Import necessary functions from instruction.py
-from .instruction import rs_to_bin, rt_to_bin, rd_to_bin, rs1_to_bin, rs2_to_bin
+from .instruction import rd_to_bin, rs1_to_bin, rs2_to_bin
 from .instruction import imm_to_bin, offset_to_bin, addr_to_bin, shamt_to_bin
-from .instruction import c0sel_to_bin, var_to_bin, _reg_matches
+from .instruction import var_to_bin, _reg_matches
 from .utils import label_to_bin

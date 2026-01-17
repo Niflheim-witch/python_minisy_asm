@@ -75,10 +75,7 @@ def link_all(asm_program: AsmProgram, user_code_start: int = USER_ADDR, use_real
     data_map = []
     
     # 1. Add BIOS
-    if use_real_bios:
-        bios_instructions = _load_bios()
-    else:
-        bios_instructions = _create_simple_bios()
+    bios_instructions = _load_bios()
     
     # Check if 'main' label exists and patch BIOS jump target
     # This is to support hardware that starts execution at a specific address (e.g. 0x2000)
@@ -202,7 +199,7 @@ def link_all(asm_program: AsmProgram, user_code_start: int = USER_ADDR, use_real
     
     # 4. Create data map for data memory
     # Extract data segment values
-    data_segment_start = 0x10010000  # Standard MIPS data segment address
+    data_segment_start = 0x00010000  # Standard MIPS data segment address
     
     # Process each variable in data segment
     for var_name, components in sorted(asm_program.data_seg.vars.items(), 
@@ -322,8 +319,9 @@ def _load_bios() -> List[str]:
         instr_count = len(bios_program.text_seg.instructions)
         
         if instr_count == 0:
-            # 尝试使用简化的BIOS
-            return _create_simple_bios()
+             # Return empty BIOS if assembly resulted in no instructions
+            print("Warning: BIOS assembly resulted in 0 instructions.")
+            return ['00000000'] * (BIOS_SIZE // 4)
         
         # 转换为十六进制指令
         bios_hex = []
@@ -342,8 +340,9 @@ def _load_bios() -> List[str]:
         result = bios_hex[:BIOS_SIZE // 4]
         return result
     except Exception as e:
-        # 如果无法加载真实BIOS，使用简化版本
-        return _create_simple_bios()
+        # If unable to load real BIOS, return empty BIOS (all NOPs)
+        print(f"Warning: Could not load BIOS: {e}")
+        return ['00000000'] * (BIOS_SIZE // 4)
 
 def _load_interrupt_handler() -> List[str]:
     """
@@ -389,34 +388,3 @@ def _load_interrupt_handler() -> List[str]:
         # 如果无法加载真实中断处理程序，使用NOP填充
         return ['00000000'] * (INT_SIZE // 4)
 
-def _create_simple_bios() -> List[str]:
-    """
-    创建简化版本的BIOS作为备用
-    
-    Returns:
-        List of hex instruction strings
-    """
-    bios = []
-    
-    # 初始化栈指针
-    bios.append('3C1C0001')  # lui $sp, 1
-    
-    # 显示'SEU61522'
-    # 简化版本只显示字符串
-    bios.append('34085345')  # li $t0, 0x5345  # 'SE'
-    bios.append('00000000')  # nop
-    bios.append('34085530')  # li $t0, 0x5530  # 'U0'
-    bios.append('00000000')  # nop
-    bios.append('34083931')  # li $t0, 0x3931  # '91'
-    bios.append('00000000')  # nop
-    bios.append('34083732')  # li $t0, 0x3732  # '72'
-    bios.append('00000000')  # nop
-    
-    # 跳转到用户代码 (0x00000800)
-    bios.append('08000200')  # j 0x00000800
-    
-    # 填充BIOS区域
-    while len(bios) * 4 < BIOS_SIZE:
-        bios.append('00000000')  # nop
-    
-    return bios[:BIOS_SIZE // 4]
