@@ -143,7 +143,38 @@ class Assembler:
                 # Parse variable components
                 components: List[VarComponent] = []
                 
-                raise SevereError(f"Unknown directive: {content.split()[0]}")
+                parts = content.split(None, 1)
+                if not parts:
+                     # Just a label without data?
+                     self.new_var(var_name, components)
+                     continue
+
+                directive = parts[0]
+                value_str = parts[1].strip() if len(parts) > 1 else ""
+
+                if directive == '.word':
+                     values = [v.strip() for v in value_str.split(',')]
+                     for v in values:
+                         components.append(self.new_comp('word', v))
+                elif directive == '.half':
+                     values = [v.strip() for v in value_str.split(',')]
+                     for v in values:
+                         components.append(self.new_comp('half', v))
+                elif directive == '.byte':
+                     values = [v.strip() for v in value_str.split(',')]
+                     for v in values:
+                         components.append(self.new_comp('byte', v))
+                elif directive == '.asciiz':
+                     # Handle string quotes
+                     match = re.search(r'"(.*)"', value_str)
+                     if match:
+                         components.append(self.new_comp('asciiz', match.group(1)))
+                     else:
+                         raise SevereError(f"Invalid asciiz format: {value_str}")
+                elif directive == '.space':
+                     components.append(self.new_comp('space', value_str))
+                else:
+                    raise SevereError(f"Unknown directive: {directive}")
                 
                 # Add variable to data segment
                 self.new_var(var_name, components)
