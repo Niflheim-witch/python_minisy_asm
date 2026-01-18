@@ -153,50 +153,6 @@ class Assembler:
             except Exception as e:
                 raise SevereError(f"Error parsing data segment line {i+1}: {str(e)}")
     
-    def _parse_comma_separated_values(self, text: str) -> List[str]:
-        """Parse comma-separated values, considering quotes"""
-        result = []
-        current = ''
-        in_quotes = False
-        escape_next = False
-        
-        for char in text:
-            if escape_next:
-                current += char
-                escape_next = False
-            elif char == '\\':
-                escape_next = True
-            elif char == '"':
-                in_quotes = not in_quotes
-                current += char
-            elif char == ',' and not in_quotes:
-                if current.strip():
-                    result.append(current.strip())
-                current = ''
-            else:
-                current += char
-        
-        # Add the last value
-        if current.strip():
-            result.append(current.strip())
-        
-        return result
-    
-    def _process_escaped_chars(self, text: str) -> str:
-        """Process escaped characters in string"""
-        # Replace escaped characters
-        replacements = {
-            '\\n': '\n',
-            '\\t': '\t',
-            '\\"': '"',
-            '\\\\': '\\'
-        }
-        
-        for escape_seq, replacement in replacements.items():
-            text = text.replace(escape_seq, replacement)
-        
-        return text
-    
     def expand_macros(self, lines: List[str]) -> List[str]:
         """Expand macros in code lines"""
         result_lines = []
@@ -289,48 +245,6 @@ class Assembler:
             expanded.append(expanded_line)
         
         return expanded
-    
-    def parse_text_seg(self, lines: List[str]) -> None:
-        """Parse text segment lines"""
-        self.current_seg = 'text'
-        self.pc = 0
-        
-        # Expand macros first
-        expanded_lines = self.expand_macros(lines)
-        
-        for i, line in enumerate(expanded_lines):
-            line = line.strip()
-            if not line or line.startswith('#'):
-                continue
-            
-            try:
-                # Check for label
-                label_match = re.match(r'^([a-zA-Z_][a-zA-Z0-9_]*)\s*:', line)
-                if label_match:
-                    # Store label
-                    label = label_match.group(1)
-                    self.new_label(label)
-                    
-                    # Remove label part from line
-                    line = line[label_match.end():].strip()
-                    
-                    # If line is empty after removing label, continue to next line
-                    if not line or line.startswith('#'):
-                        continue
-                
-                # Parse instruction
-                instruction = self._parse_one_line(line, i+1)
-                if instruction:
-                    # Add instruction to text segment
-                    self.program.text_seg.instructions.append(instruction)
-                    # Update PC (each instruction is 4 bytes)
-                    self.pc += 4
-                    self.program.text_seg.total_size += 4
-                    
-            except SevereError:
-                raise
-            except Exception as e:
-                raise SevereError(f"Error parsing text segment line {i+1}: {str(e)}")
     
     def _parse_one_line(self, line: str, line_num: int) -> Optional[Instruction]:
         """Parse a single instruction line"""
